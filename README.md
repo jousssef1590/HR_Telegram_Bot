@@ -118,9 +118,9 @@ FORMS: Final = {
     'complaint_form': 'https://docs.google.com/forms/d/1vQzMh9tye6jiJZWdZHSj0vCuehN8j6Q14o1elwhzDNg/edit',
 ```
 
-### Command Package
+## Command Package
 
-
+### Input
 ```python
 {
 # Store user states
@@ -158,6 +158,177 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 ### Output 
 
-![Start](image/Star-Command.png)
+![Start](image/Start.png.png)
+
+## Authorization Check
+
+```python
+{
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    message_type: str = update.message.chat.type
+    text: str = update.message.text
+    username: str = update.message.from_user.username
+
+    print(f'user (@{username}) in {message_type}: "{text}"')
+
+    if not is_authorized(username):
+        print(f'Unauthorized user: @{username}')
+        await update.message.reply_text('❌ Unauthorized access.')
+        return
+}
+
+````
+
+## Password Verification
+
+```python
+{
+def handle_response(text: str, username: str) -> str:
+    processed: str = text.lower()n
+
+    if username in user_states and user_states[username] == 'awaiting_policy_password':
+        if processed == POLICY_PASSWORD:
+            user_states[username] = 'verified_policy_password'
+            return '🔓 Password verified. Here is the policy document:'
+        else:
+            return '❌ Incorrect password. Please try again.'
+}
+
+```
+
+### Output 
+
+![Document passkey](image/Doc-passkey.jpg)
+
+
+## Handling Document Commands and Sending Files in Async Python
+
+```python
+
+{
+  with open(document_path, 'rb') as file:
+        await context.bot.send_document(chat_id=chat_id, document=InputFile(file), filename=os.path.basename(document_path))
+        await context.bot.send_message(chat_id=chat_id, text=f'📄 Here is the {doc_key.replace("_", " ").capitalize()}.')
+
+async def document_command(update: Update, context: ContextTypes.DEFAULT_TYPE, section: str):
+    documents = []
+    if section == 'general_documents':
+        documents = [
+            ('Policy Document 📄', 'policy'),
+            ('Another Document 📄', 'another_document')
+        ]
+    elif section == 'onboarding_documents':
+        documents = [
+            ('Employee Onboarding Process Feedback 📝', 'onboarding_feedback'),
+            ('Probation Period Review 📝', 'probation_period')
+        ]
+    elif section == 'recruiting_documents':
+        documents = [
+            ('Recruiting Document 📄', 'another_document')  # Replace with actual recruiting documents
+        ]
+    elif section == 'employee_data_documents':
+        documents = [
+            ('L1 PS Support Team 📝', 'l1_ps_support_team'),
+            ('Expansion Team MENA 📝', 'expansion_team_mena'),
+            ('Expansion Team MENA (EN) 📝', 'expansion_team_mena_en'),
+            ('Retention MENA (Online) 📝', 'retention_mena_online'),
+            ('Retention MENA (Internal Checking) 📝', 'retention_mena_internal_checking')
+        ]
+
+    keyboard = [[InlineKeyboardButton(name, callback_data=key)] for name, key in documents]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    message = f"📂 Here are the available {section.replace('_', ' ')}:"
+    await update.callback_query.message.reply_text(message, reply_markup=reply_markup)
+}
+
+```
+
+### Output 
+
+![Documents](image/Star-Command.png)
+
+
+## Handling Button Clicks and Document Requests
+
+```python
+
+{
+  form_descriptions = {
+        'onboarding_feedback': "📝 Employee Onboarding Process Feedback - Share your feedback about the onboarding process.",
+        'probation_period': "📝 Probation Period Review - Provide your review of the probation period.",
+        'gallup_engagement': "📝 Gallup Q10 Engagement - Participate in the Gallup Q10 engagement survey.",
+        'complaint_form': "📝 Employee Complaint Form - Submit a formal complaint.",
+        'vacancy_description': "📝 New Vacancy Description - Describe a new job vacancy.",
+        'medical_form': "📝 Medical Form - Fill out the required medical information.",
+        'l1_ps_support_team': "📝 L1 PS Support Team - Enter details for the L1 PS support team.",
+        'expansion_team_mena': "📝 Expansion Team MENA - Provide information for the MENA expansion team.",
+        'expansion_team_mena_en': "📝 Expansion Team MENA (EN) - English version for the MENA expansion team.",
+        'retention_mena_online': "📝 Retention MENA (Online) - Online details for MENA retention.",
+        'retention_mena_internal_checking': "📝 Retention MENA (Internal Checking) - Internal checking for MENA retention."
+
+
+    keyboard = [[InlineKeyboardButton(description, url=url)] for url, description in zip(FORMS.values(), form_descriptions.values())]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    forms_message = "📑 Here are the available HR forms. Click the buttons below to access them:"
+    await update.callback_query.message.reply_text(forms_message, reply_markup=reply_markup)
+
+async def button_click_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    
+    if query.data == 'general_documents':
+        await document_command(update, context, 'general_documents')
+    elif query.data == 'onboarding_documents':
+        await document_command(update, context, 'onboarding_documents')
+    elif query.data == 'recruiting_documents':
+        await document_command(update, context, 'recruiting_documents')
+    elif query.data == 'employee_data_documents':
+        await document_command(update, context, 'employee_data_documents')
+    elif query.data == 'forms':
+        await forms_command(update, context)
+    elif query.data in DOCUMENTS:
+        if query.data == 'policy':
+            user_states[update.callback_query.from_user.username] = 'awaiting_policy_password'
+            await request_policy_password(update, context)
+        else:
+            await send_document(update, context, query.data)
+
+async def request_policy_password(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.callback_query.message.reply_text('🔒 Please enter the password to access the policy document.')
+}
+
+```
+### Output 
+
+![ Handling Button](image/requesting-Docs.png)
+
+## Setting Up and Running an Async Telegram Bot 
+
+```python
+
+{
+def main() -> None:
+    app = Application.builder().token(TOKEN).build()
+
+    app.add_handler(CommandHandler('start', start_command))
+    app.add_handler(CommandHandler('help', help_command))
+    app.add_handler(CommandHandler('custom', custom_command))
+
+    app.add_handler(CallbackQueryHandler(button_click_handler))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+
+    print('Bot is running...')
+    app.run_polling(poll_interval=3)
+
+if __name__ == '__main__':
+    main()
+}
+```
+
+# Benefits and Impact
+
+## Efficiency Improvements
+
 
 
